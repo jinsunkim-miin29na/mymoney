@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>우리집 가계부 (DB연동형)</title>
+    <title>부부 통합 자산관리</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; }
+        body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
         .excel-input { width: 100%; height: 100%; padding: 0 8px; border: none; outline: none; background: transparent; }
         .excel-input:focus { background-color: #eff6ff; }
         .mini-table th { font-size: 0.75rem; padding: 8px 4px; text-align: left; color: #6b7280; background: #f9fafb; }
@@ -15,14 +15,23 @@
         .badge-card { background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; }
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
+        
+        /* 요약 카드 스타일 (분리형) */
+        .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
+        .summary-header { background: #1f2937; color: white; padding: 10px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.9rem; }
+        .summary-row:last-child { border-bottom: none; }
+        .label-user { font-weight: bold; width: 60px; }
+        .val-income { color: #2563eb; }
+        .val-expense { color: #dc2626; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body>
 
     <div id="view-write">
         <div class="bg-white sticky top-0 z-40 shadow-md border-b">
             <div class="flex justify-between items-center p-3 bg-gray-800 text-white">
-                <h1 class="font-bold text-lg">📝 월말 정산 (DB연동)</h1>
+                <h1 class="font-bold text-lg">📝 월말 정산</h1>
                 <input type="month" id="global-month" class="text-gray-900 font-bold px-2 py-1 rounded border-none outline-none">
             </div>
             
@@ -91,26 +100,18 @@
     </div>
 
     <div id="view-summary" class="hidden-tab">
-        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-gray-800 text-white">
-            <h1 class="font-bold text-lg">📊 전체 기간 요약</h1>
+        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-gray-800 text-white flex justify-between items-center">
+            <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
+            <div class="text-xs text-gray-300">최근 월 순서</div>
         </div>
-        <div class="max-w-4xl mx-auto p-4">
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-100 text-gray-700 uppercase">
-                        <tr>
-                            <th class="px-4 py-3">월(Month)</th>
-                            <th class="px-4 py-3 text-right text-blue-600">총 수입</th>
-                            <th class="px-4 py-3 text-right text-red-600">총 지출</th>
-                            <th class="px-4 py-3 text-right">잔액</th>
-                        </tr>
-                    </thead>
-                    <tbody id="summary-body" class="divide-y divide-gray-200"></tbody>
-                </table>
+
+        <div class="max-w-4xl mx-auto p-4" id="summary-container">
             </div>
-            <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100 text-center">
-                <p class="text-gray-500 text-sm mb-1">지금까지 모은 돈 (누적 잔액)</p>
-                <p class="text-3xl font-bold text-indigo-700" id="grand-total-balance">0원</p>
+
+        <div class="p-4 text-center">
+            <div class="bg-indigo-100 p-4 rounded-xl inline-block w-full max-w-sm">
+                <p class="text-gray-500 text-xs mb-1">우리 집 총 누적 자산(현금)</p>
+                <p class="text-2xl font-bold text-indigo-700" id="grand-total-balance">0원</p>
             </div>
         </div>
     </div>
@@ -129,7 +130,7 @@
 
     <script type="module">
         // =========================================================
-        // 🛑 중요: 아래 값을 1단계에서 복사한 값으로 바꿔주세요!
+        // 🔑 입력해주신 키를 적용했습니다.
         // =========================================================
         const firebaseConfig = {
             apiKey: "AIzaSyBAGmA7oUu5xZcqiEn_JIZ21CO0n6bRFUM",
@@ -144,35 +145,33 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // Firebase 초기화
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // 변수 및 설정
         let ledgerData = [];
-        const today = new Date();
         const globalMonthEl = document.getElementById('global-month');
+        // 초기 날짜 세팅
+        const today = new Date();
         globalMonthEl.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
         const CAT_INCOME = ["월급", "계약금", "정부지원금", "경조사비", "기타수입"];
         const CAT_EXPENSE = ["월 카드값", "고정비", "생활비", "기타지출"];
 
-        // --- 실시간 데이터 불러오기 (DB Listener) ---
-        // DB에 변화가 생기면(남편이 입력하면) 즉시 이 함수가 실행됩니다.
+        // 실시간 데이터 로드
         const q = query(collection(db, "ledger"), orderBy("id", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        onSnapshot(q, (snapshot) => {
             ledgerData = [];
             snapshot.forEach((doc) => {
                 ledgerData.push({ dbId: doc.id, ...doc.data() });
             });
-            // 데이터가 로드되면 화면 갱신
             renderDaily();
             renderSummary();
         });
 
-        // --- 기능 구현 ---
-        
-        // 데이터 추가 (DB 저장)
+        // ----------------------------------------
+        // 기능 함수들
+        // ----------------------------------------
+
         window.addData = async function() {
             const month = document.getElementById('global-month').value;
             const who = document.getElementById('in-who').value;
@@ -185,35 +184,29 @@
             if(!desc || amount === 0) return alert("내용과 금액을 입력해주세요.");
 
             try {
-                // Firestore에 저장
                 await addDoc(collection(db, "ledger"), {
-                    id: Date.now(), // 정렬용 타임스탬프
+                    id: Date.now(),
                     month, who, type, cat, method, desc, amount
                 });
-                
-                // 입력창 초기화
                 document.getElementById('in-desc').value = '';
                 document.getElementById('in-amount').value = '';
                 document.getElementById('in-desc').focus();
             } catch (e) {
-                console.error("Error adding document: ", e);
-                alert("저장 중 오류가 발생했습니다.");
+                alert("저장 오류: " + e.message);
             }
         }
 
-        // 데이터 삭제 (DB 삭제)
         window.removeData = async function(dbId) {
             if(confirm("정말 삭제하시겠습니까?")) {
                 await deleteDoc(doc(db, "ledger", dbId));
             }
         }
 
-        // --- 화면 렌더링 로직 (UI) ---
+        // [탭 1] 작성 화면 렌더링
         window.renderDaily = function() {
             const targetMonth = globalMonthEl.value;
             const currentData = ledgerData.filter(d => d.month === targetMonth);
             
-            // 테이블 초기화
             ['husband', 'wife'].forEach(w => ['income', 'expense'].forEach(t => {
                 document.getElementById(`list-${w}-${t}`).innerHTML = '';
                 document.getElementById(`total-${w}-${t}`).innerText = '0원';
@@ -241,12 +234,10 @@
                         <td class="w-8 text-center"><button onclick="window.removeData('${item.dbId}')" class="text-gray-300 hover:text-red-500">×</button></td>
                     </tr>
                 `;
-
                 if(item.type === 'income') totalIncome += item.amount;
                 else totalExpense += item.amount;
             });
 
-            // 합계 업데이트
             ['husband', 'wife'].forEach(w => ['income', 'expense'].forEach(t => {
                 const sum = currentData.filter(d => d.who === w && d.type === t).reduce((a,c)=>a+c.amount,0);
                 document.getElementById(`total-${w}-${t}`).innerText = sum.toLocaleString() + '원';
@@ -255,46 +246,81 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
+        // [탭 2] 전체보기 요약 렌더링 (인물별 분리!)
         window.renderSummary = function() {
-            const tbody = document.getElementById('summary-body');
-            tbody.innerHTML = '';
+            const container = document.getElementById('summary-container');
+            container.innerHTML = '';
 
+            // 1. 월별로 데이터 그룹화
             const summary = {};
             ledgerData.forEach(item => {
-                if(!summary[item.month]) summary[item.month] = { income: 0, expense: 0 };
-                if(item.type === 'income') summary[item.month].income += item.amount;
-                else summary[item.month].expense += item.amount;
+                if(!summary[item.month]) {
+                    summary[item.month] = { 
+                        husband: { income: 0, expense: 0 },
+                        wife: { income: 0, expense: 0 }
+                    };
+                }
+                // 인물별 / 수입지출별 합산
+                if(item.type === 'income') summary[item.month][item.who].income += item.amount;
+                else summary[item.month][item.who].expense += item.amount;
             });
 
+            // 2. 월 내림차순(최신순) 정렬하여 카드 생성
             const sortedMonths = Object.keys(summary).sort().reverse();
             let grandBalance = 0;
 
             sortedMonths.forEach(month => {
                 const s = summary[month];
-                const balance = s.income - s.expense;
-                grandBalance += balance;
+                const husBal = s.husband.income - s.husband.expense;
+                const wifeBal = s.wife.income - s.wife.expense;
+                const monthTotal = husBal + wifeBal;
+                grandBalance += monthTotal;
 
-                tbody.innerHTML += `
-                    <tr class="hover:bg-gray-50 border-b">
-                        <td class="px-4 py-3 font-bold">${month}</td>
-                        <td class="px-4 py-3 text-right text-blue-600 font-medium">+${s.income.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-right text-red-600 font-medium">-${s.expense.toLocaleString()}</td>
-                        <td class="px-4 py-3 text-right font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            ${balance.toLocaleString()}
-                        </td>
-                    </tr>
+                // 카드 HTML 생성 (남편 줄 / 아내 줄 분리)
+                const cardHTML = `
+                    <div class="summary-card">
+                        <div class="summary-header">
+                            <span>📅 ${month}</span>
+                            <span class="${monthTotal >= 0 ? 'text-green-300' : 'text-red-300'} text-sm">
+                                합계 ${monthTotal > 0 ? '+' : ''}${monthTotal.toLocaleString()}
+                            </span>
+                        </div>
+                        
+                        <div class="summary-row">
+                            <div class="label-user text-blue-800">👨‍💻 남편</div>
+                            <div>
+                                <span class="val-income text-xs">수입 +${s.husband.income.toLocaleString()}</span> / 
+                                <span class="val-expense text-xs">지출 -${s.husband.expense.toLocaleString()}</span>
+                            </div>
+                            <div class="font-bold ${husBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
+                                ${husBal.toLocaleString()}
+                            </div>
+                        </div>
+
+                        <div class="summary-row">
+                            <div class="label-user text-indigo-800">👩‍💼 아내</div>
+                            <div>
+                                <span class="val-income text-xs">수입 +${s.wife.income.toLocaleString()}</span> / 
+                                <span class="val-expense text-xs">지출 -${s.wife.expense.toLocaleString()}</span>
+                            </div>
+                            <div class="font-bold ${wifeBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
+                                ${wifeBal.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
                 `;
+                container.innerHTML += cardHTML;
             });
+
             document.getElementById('grand-total-balance').innerText = grandBalance.toLocaleString() + '원';
         }
 
-        // 유틸리티 함수들 (전역 스코프 노출)
+        // 공통 UI 함수
         window.updateForm = function() {
             const type = document.getElementById('in-type').value;
             const methodSelect = document.getElementById('in-method');
             const catSelect = document.getElementById('in-category');
             catSelect.innerHTML = ''; 
-
             if(type === 'income') {
                 methodSelect.classList.add('hidden');
                 CAT_INCOME.forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
@@ -309,14 +335,13 @@
             const cat = document.getElementById('in-category').value;
             const desc = document.getElementById('in-desc');
             if(cat === '월 카드값') desc.placeholder = "예: 현대카드";
-            else if(cat === '고정비') desc.placeholder = "예: 월세, 이자";
+            else if(cat === '고정비') desc.placeholder = "예: 월세";
             else desc.placeholder = "내용 입력";
         }
 
         window.switchTab = function(mode) {
             const btnWrite = document.querySelector('button[onclick="window.switchTab(\'write\')"]');
             const btnSummary = document.querySelector('button[onclick="window.switchTab(\'summary\')"]');
-
             if (mode === 'write') {
                 document.getElementById('view-write').classList.remove('hidden-tab');
                 document.getElementById('view-summary').classList.add('hidden-tab');
@@ -332,18 +357,15 @@
             }
         }
 
-        // 초기 실행
-        updateForm();
-        
-        // 월 변경 시 렌더링 이벤트 리스너
-        globalMonthEl.addEventListener('change', renderDaily);
-
-        // 엔터키 입력 이벤트
+        // 이벤트 리스너
+        globalMonthEl.addEventListener('change', window.renderDaily);
         document.getElementById('in-amount').addEventListener('keydown', (e) => {
             if(e.key === 'Enter') window.addData();
         });
         document.getElementById('btn-add').addEventListener('click', window.addData);
 
+        // 초기 실행
+        updateForm();
     </script>
 </body>
 </html>
