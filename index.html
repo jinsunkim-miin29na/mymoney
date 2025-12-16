@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리</title>
+    <title>부부 통합 자산관리 (분리형)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
@@ -16,9 +16,10 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        /* 여기가 핵심: 요약 탭을 카드 형태로 분리하는 스타일 */
+        /* 요약 카드 스타일 */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
-        .summary-header { background: #374151; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        /* 구분을 위해 헤더 색상을 바꿈 */
+        .summary-header { background: #047857; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.95rem; }
         .summary-row:last-child { border-bottom: none; }
         .label-user { font-weight: bold; display: flex; align-items: center; gap: 6px; }
@@ -100,9 +101,9 @@
     </div>
 
     <div id="view-summary" class="hidden-tab">
-        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-gray-800 text-white flex justify-between items-center">
+        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-green-700 text-white flex justify-between items-center">
             <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
-            <div class="text-xs text-gray-300">최근 월 순서</div>
+            <div class="text-xs text-gray-100">최근 월 순서</div>
         </div>
 
         <div class="max-w-4xl mx-auto p-4" id="summary-container">
@@ -159,7 +160,11 @@
         onSnapshot(q, (snapshot) => {
             ledgerData = [];
             snapshot.forEach((doc) => {
-                ledgerData.push({ dbId: doc.id, ...doc.data() });
+                // 안전장치: DB에 이상한 데이터가 있어도 죽지 않게 함
+                const data = doc.data();
+                if(data.who && data.type && data.month) {
+                    ledgerData.push({ dbId: doc.id, ...data });
+                }
             });
             renderDaily();
             renderSummary();
@@ -247,6 +252,9 @@
             // 데이터 그룹화
             const summary = {};
             ledgerData.forEach(item => {
+                // 안전장치: who가 이상하면 스킵
+                if(item.who !== 'husband' && item.who !== 'wife') return;
+
                 if(!summary[item.month]) {
                     summary[item.month] = { 
                         husband: { income: 0, expense: 0 },
