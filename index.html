@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리 v8.1 (구분형)</title>
+    <title>부부 통합 자산관리 v8.3 (누적자산)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
         
-        /* 링크 클릭 시 보라색으로 변하는 문제 방지 */
         a, a:visited, a:hover, a:active { color: inherit; text-decoration: none; }
 
         .excel-input { width: 100%; height: 100%; padding: 0 8px; border: none; outline: none; background: transparent; }
@@ -20,19 +19,9 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        /* 요약 카드 스타일 */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
         .summary-header { padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 인물별 행 스타일 (배경색 구분을 위해 패딩 조정) */
-        .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-size: 0.95rem; align-items: center; }
-        .summary-row:last-child { border-bottom: none; }
-        
-        .label-user { font-weight: bold; display: flex; align-items: center; gap: 6px; min-width: 60px; }
-        .val-income { color: #2563eb; font-size: 0.85rem; }
-        .val-expense { color: #dc2626; font-size: 0.85rem; }
-        
-        /* 강제 스타일 (보라색 헤더) */
         .force-purple { background-color: #6b21a8 !important; color: white !important; }
     </style>
 </head>
@@ -73,7 +62,7 @@
         <div class="max-w-6xl mx-auto p-3 mt-2">
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex justify-between items-center">
                 <div>
-                    <p class="text-xs text-gray-500 mb-1">이달의 현금 잔액 (합산)</p>
+                    <p class="text-xs text-gray-500 mb-1">이달의 현금 흐름 (합산)</p>
                     <p class="text-2xl font-bold text-blue-600" id="month-balance">0원</p>
                 </div>
                 <div class="text-right">
@@ -112,7 +101,7 @@
     <div id="view-summary" class="hidden-tab">
         <div class="sticky top-0 z-40 shadow-md p-4 flex justify-between items-center force-purple">
             <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
-            <div class="text-xs text-purple-200">v8.1 (남녀구분)</div>
+            <div class="text-xs text-purple-200">v8.3 (누적자산)</div>
         </div>
 
         <div class="max-w-4xl mx-auto p-4" id="summary-container">
@@ -120,15 +109,15 @@
 
         <div class="p-4 mb-20">
             <div class="bg-gray-800 text-white rounded-xl p-5 shadow-lg w-full mx-auto max-w-md">
-                <h3 class="text-center text-sm text-gray-400 mb-4 border-b border-gray-600 pb-2">💰 현재까지 모은 돈 (누적)</h3>
+                <h3 class="text-center text-sm text-gray-400 mb-4 border-b border-gray-600 pb-2">💰 최종 누적 자산 (현재 기준)</h3>
                 
                 <div class="flex justify-between items-center mb-3">
-                    <span class="text-blue-300 font-bold flex items-center gap-2">👨‍💻 남편 잔액</span>
+                    <span class="text-blue-300 font-bold flex items-center gap-2">👨‍💻 남편 총 자산</span>
                     <span class="text-xl font-bold" id="grand-husband-balance">0원</span>
                 </div>
                 
                 <div class="flex justify-between items-center">
-                    <span class="text-pink-300 font-bold flex items-center gap-2">👩‍💼 아내 잔액</span>
+                    <span class="text-pink-300 font-bold flex items-center gap-2">👩‍💼 아내 총 자산</span>
                     <span class="text-xl font-bold" id="grand-wife-balance">0원</span>
                 </div>
             </div>
@@ -171,9 +160,6 @@
         const CAT_INCOME = ["월급", "계약금", "정부지원금", "경조사비", "기타수입"];
         const CAT_EXPENSE = ["월 카드값", "고정비", "생활비", "기타지출"];
 
-        // -----------------------------------------------------------
-        // 1. 핵심 함수: 일별 보기 (작성 탭)
-        // -----------------------------------------------------------
         const renderDaily = () => {
             const targetMonth = globalMonthEl.value;
             const currentData = ledgerData.filter(d => d.month === targetMonth);
@@ -219,9 +205,7 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        // -----------------------------------------------------------
-        // 2. 핵심 함수: 월별/인물별 요약 (전체보기 탭) - 수정됨
-        // -----------------------------------------------------------
+        // [핵심 변경] 누적 자산을 계산하는 로직으로 변경
         const renderSummary = () => {
             try {
                 const container = document.getElementById('summary-container');
@@ -229,7 +213,7 @@
 
                 const summary = {};
                 
-                // 데이터 집계
+                // 1. 월별 데이터 집계
                 ledgerData.forEach(item => {
                     if(!item.who || !item.month || !item.type) return;
 
@@ -245,50 +229,74 @@
                     }
                 });
 
-                const sortedMonths = Object.keys(summary).sort().reverse();
+                // 2. 과거 -> 최신 순으로 정렬하여 누적 계산
+                const sortedMonthsAsc = Object.keys(summary).sort();
                 
-                // [변경] 누적 합계를 각각 계산하기 위한 변수
-                let totalHusbandAcc = 0;
-                let totalWifeAcc = 0;
+                let accHusband = 0;
+                let accWife = 0;
 
-                sortedMonths.forEach(month => {
+                // 각 달마다 누적액 계산하여 저장
+                sortedMonthsAsc.forEach(month => {
                     const s = summary[month];
-                    const husBal = s.husband.income - s.husband.expense;
-                    const wifeBal = s.wife.income - s.wife.expense;
-                    const monthTotal = husBal + wifeBal;
+                    // 이번 달 순이익
+                    const netHusband = s.husband.income - s.husband.expense;
+                    const netWife = s.wife.income - s.wife.expense;
+                    
+                    // 누적액 갱신
+                    accHusband += netHusband;
+                    accWife += netWife;
 
-                    // 각각 누적
-                    totalHusbandAcc += husBal;
-                    totalWifeAcc += wifeBal;
+                    // 해당 월의 데이터에 '누적자산' 속성 추가
+                    s.husband.totalAsset = accHusband;
+                    s.wife.totalAsset = accWife;
+                });
 
-                    // [디자인 변경] 남편/아내 영역에 배경색 추가하여 시각적 분리
+                // 3. 화면에는 최신순(역순)으로 보여줌
+                const sortedMonthsDesc = sortedMonthsAsc.reverse();
+
+                sortedMonthsDesc.forEach(month => {
+                    const s = summary[month];
+                    const monthNet = (s.husband.income - s.husband.expense) + (s.wife.income - s.wife.expense);
+                    
                     const cardHTML = `
                         <div class="summary-card">
                             <div class="summary-header force-purple">
                                 <span>📅 ${month}</span>
-                                <span class="text-sm opacity-90">월 합계: ${monthTotal > 0 ? '+' : ''}${monthTotal.toLocaleString()}</span>
+                                <span class="text-xs font-normal opacity-80">월 순수익: ${monthNet > 0 ? '+' : ''}${monthNet.toLocaleString()}</span>
                             </div>
                             
-                            <div class="summary-row" style="background-color: #eff6ff;">
-                                <div class="label-user text-blue-800">👨‍💻 남편</div>
-                                <div class="text-right flex-1 ml-4">
-                                    <div class="text-xs text-gray-500 mb-1">
-                                        수입 ${s.husband.income.toLocaleString()} / 지출 ${s.husband.expense.toLocaleString()}
+                            <div class="p-3 border-b border-gray-100" style="background-color: #eff6ff;">
+                                <div class="font-bold text-blue-800 mb-2 flex items-center gap-1">👨‍💻 남편</div>
+                                <div class="grid grid-cols-3 gap-1 text-center items-center">
+                                    <div class="text-blue-600">
+                                        <div class="text-xs text-gray-500 mb-1">수입</div>
+                                        <div class="font-bold text-sm">${s.husband.income.toLocaleString()}</div>
                                     </div>
-                                    <div class="font-bold text-lg ${husBal >= 0 ? 'text-blue-600' : 'text-red-500'}">
-                                        ${husBal.toLocaleString()} 원
+                                    <div class="text-red-500 border-l border-r border-blue-100">
+                                        <div class="text-xs text-gray-500 mb-1">지출</div>
+                                        <div class="font-bold text-sm">${s.husband.expense.toLocaleString()}</div>
+                                    </div>
+                                    <div class="text-gray-800">
+                                        <div class="text-xs text-blue-900 font-bold mb-1">현 자산(누적)</div>
+                                        <div class="font-bold text-base text-blue-900">${s.husband.totalAsset.toLocaleString()}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="summary-row" style="background-color: #fdf2f8;">
-                                <div class="label-user text-pink-800">👩‍💼 아내</div>
-                                <div class="text-right flex-1 ml-4">
-                                    <div class="text-xs text-gray-500 mb-1">
-                                        수입 ${s.wife.income.toLocaleString()} / 지출 ${s.wife.expense.toLocaleString()}
+                            <div class="p-3" style="background-color: #fdf2f8;">
+                                <div class="font-bold text-pink-800 mb-2 flex items-center gap-1">👩‍💼 아내</div>
+                                <div class="grid grid-cols-3 gap-1 text-center items-center">
+                                    <div class="text-blue-600">
+                                        <div class="text-xs text-gray-500 mb-1">수입</div>
+                                        <div class="font-bold text-sm">${s.wife.income.toLocaleString()}</div>
                                     </div>
-                                    <div class="font-bold text-lg ${wifeBal >= 0 ? 'text-pink-600' : 'text-red-500'}">
-                                        ${wifeBal.toLocaleString()} 원
+                                    <div class="text-red-500 border-l border-r border-pink-100">
+                                        <div class="text-xs text-gray-500 mb-1">지출</div>
+                                        <div class="font-bold text-sm">${s.wife.expense.toLocaleString()}</div>
+                                    </div>
+                                    <div class="text-gray-800">
+                                        <div class="text-xs text-pink-900 font-bold mb-1">현 자산(누적)</div>
+                                        <div class="font-bold text-base text-pink-900">${s.wife.totalAsset.toLocaleString()}</div>
                                     </div>
                                 </div>
                             </div>
@@ -297,9 +305,8 @@
                     container.innerHTML += cardHTML;
                 });
 
-                // [변경] 하단 누적 잔액을 각각 표시
-                document.getElementById('grand-husband-balance').innerText = totalHusbandAcc.toLocaleString() + '원';
-                document.getElementById('grand-wife-balance').innerText = totalWifeAcc.toLocaleString() + '원';
+                document.getElementById('grand-husband-balance').innerText = accHusband.toLocaleString() + '원';
+                document.getElementById('grand-wife-balance').innerText = accWife.toLocaleString() + '원';
 
             } catch (err) {
                 console.error(err);
