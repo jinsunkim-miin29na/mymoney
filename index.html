@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리 v7.0</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>부부 통합 자산관리 v7.1</title> <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
         .excel-input { width: 100%; height: 100%; padding: 0 8px; border: none; outline: none; background: transparent; }
@@ -16,9 +15,12 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        /* [변경] 요약 카드 헤더를 보라색(#6b21a8)으로 변경하여 시각적으로 구분 */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
-        .summary-header { background: #6b21a8; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* [강제 적용] 인라인 스타일이 안 먹힐까봐 CSS로도 한번 더 강제 */
+        .force-purple { background-color: #6b21a8 !important; color: white !important; }
+        
+        .summary-header { padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.95rem; }
         .summary-row:last-child { border-bottom: none; }
         .label-user { font-weight: bold; display: flex; align-items: center; gap: 6px; }
@@ -31,7 +33,7 @@
     <div id="view-write">
         <div class="bg-white sticky top-0 z-40 shadow-md border-b">
             <div class="flex justify-between items-center p-3 bg-gray-800 text-white">
-                <h1 class="font-bold text-lg">📝 월말 정산 (v7.0)</h1>
+                <h1 class="font-bold text-lg">📝 월말 정산 (v7.1)</h1>
                 <input type="month" id="global-month" class="text-gray-900 font-bold px-2 py-1 rounded border-none outline-none">
             </div>
             
@@ -52,7 +54,7 @@
                 </div>
                 <div class="flex h-12 flex-1 items-center">
                     <select id="in-category" class="excel-input w-28 border-r text-sm font-bold text-gray-600" onchange="window.updateHint()">
-                        </select>
+                    </select>
                     <input type="text" id="in-desc" class="excel-input flex-1 min-w-[80px]" placeholder="내용">
                     <input type="number" id="in-amount" class="excel-input w-24 text-right font-bold text-lg text-blue-900" placeholder="0">
                     <button id="btn-add" class="bg-blue-600 text-white w-16 h-full font-bold text-sm hover:bg-blue-700">입력</button>
@@ -100,9 +102,9 @@
     </div>
 
     <div id="view-summary" class="hidden-tab">
-        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-purple-800 text-white flex justify-between items-center">
-            <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
-            <div class="text-xs text-purple-200">v7.0 (보라색이면 최신)</div>
+        <div class="sticky top-0 z-40 shadow-md p-4 flex justify-between items-center" style="background-color: #6b21a8 !important; color: white;">
+            <h1 class="font-bold text-lg">📊 월별/인물별 요약 (v7.1)</h1>
+            <div class="text-xs text-purple-200">최근 월 순서</div>
         </div>
 
         <div class="max-w-4xl mx-auto p-4" id="summary-container">
@@ -239,14 +241,12 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        // 여기가 진짜 중요! (분리 로직)
         window.renderSummary = function() {
             const container = document.getElementById('summary-container');
             container.innerHTML = '';
 
             const summary = {};
             ledgerData.forEach(item => {
-                // 데이터 안전장치
                 if(item.who !== 'husband' && item.who !== 'wife') return;
 
                 if(!summary[item.month]) {
@@ -269,10 +269,9 @@
                 const monthTotal = husBal + wifeBal;
                 grandBalance += monthTotal;
 
-                // 카드 HTML
                 const cardHTML = `
                     <div class="summary-card">
-                        <div class="summary-header">
+                        <div class="summary-header force-purple">
                             <span>📅 ${month}</span>
                             <span class="${monthTotal >= 0 ? 'text-green-300' : 'text-red-300'} text-sm">
                                 합계 ${monthTotal > 0 ? '+' : ''}${monthTotal.toLocaleString()}
