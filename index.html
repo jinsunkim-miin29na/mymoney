@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리 v7.1</title> <script src="https://cdn.tailwindcss.com"></script>
+    <title>부부 통합 자산관리 v8.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
         .excel-input { width: 100%; height: 100%; padding: 0 8px; border: none; outline: none; background: transparent; }
@@ -15,17 +16,17 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
+        /* 요약 카드 스타일 */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
-        
-        /* [강제 적용] 인라인 스타일이 안 먹힐까봐 CSS로도 한번 더 강제 */
-        .force-purple { background-color: #6b21a8 !important; color: white !important; }
-        
         .summary-header { padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.95rem; }
         .summary-row:last-child { border-bottom: none; }
         .label-user { font-weight: bold; display: flex; align-items: center; gap: 6px; }
         .val-income { color: #2563eb; font-size: 0.85rem; }
         .val-expense { color: #dc2626; font-size: 0.85rem; }
+        
+        /* 강제 스타일 (보라색 헤더) */
+        .force-purple { background-color: #6b21a8 !important; color: white !important; }
     </style>
 </head>
 <body>
@@ -33,7 +34,7 @@
     <div id="view-write">
         <div class="bg-white sticky top-0 z-40 shadow-md border-b">
             <div class="flex justify-between items-center p-3 bg-gray-800 text-white">
-                <h1 class="font-bold text-lg">📝 월말 정산 (v7.1)</h1>
+                <h1 class="font-bold text-lg">📝 월말 정산</h1>
                 <input type="month" id="global-month" class="text-gray-900 font-bold px-2 py-1 rounded border-none outline-none">
             </div>
             
@@ -102,9 +103,9 @@
     </div>
 
     <div id="view-summary" class="hidden-tab">
-        <div class="sticky top-0 z-40 shadow-md p-4 flex justify-between items-center" style="background-color: #6b21a8 !important; color: white;">
-            <h1 class="font-bold text-lg">📊 월별/인물별 요약 (v7.1)</h1>
-            <div class="text-xs text-purple-200">최근 월 순서</div>
+        <div class="sticky top-0 z-40 shadow-md p-4 flex justify-between items-center force-purple">
+            <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
+            <div class="text-xs text-purple-200">v8.0 (최신)</div>
         </div>
 
         <div class="max-w-4xl mx-auto p-4" id="summary-container">
@@ -119,19 +120,18 @@
     </div>
 
     <nav class="fixed bottom-0 w-full bg-white border-t border-gray-300 flex justify-around items-center h-16 z-50 shadow-lg">
-        <button onclick="window.switchTab('write')" class="flex flex-col items-center w-full h-full justify-center active-tab text-blue-600">
+        <button onclick="window.switchTab('write')" class="flex flex-col items-center w-full h-full justify-center active-tab text-blue-600" id="nav-write">
             <span class="text-2xl">📝</span>
             <span class="text-xs font-bold mt-1">작성하기</span>
         </button>
         <div class="w-px h-8 bg-gray-200"></div>
-        <button onclick="window.switchTab('summary')" class="flex flex-col items-center w-full h-full justify-center text-gray-400">
+        <button onclick="window.switchTab('summary')" class="flex flex-col items-center w-full h-full justify-center text-gray-400" id="nav-summary">
             <span class="text-2xl">📊</span>
             <span class="text-xs font-bold mt-1">전체보기</span>
         </button>
     </nav>
 
     <script type="module">
-        // =========================================================
         const firebaseConfig = {
             apiKey: "AIzaSyBAGmA7oUu5xZcqiEn_JIZ21CO0n6bRFUM",
             authDomain: "mymoney-ledger.firebaseapp.com",
@@ -140,7 +140,6 @@
             messagingSenderId: "536040673268",
             appId: "1:536040673268:web:5cc54395dd33fbb99bb3a1"
         };
-        // =========================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -156,49 +155,11 @@
         const CAT_INCOME = ["월급", "계약금", "정부지원금", "경조사비", "기타수입"];
         const CAT_EXPENSE = ["월 카드값", "고정비", "생활비", "기타지출"];
 
-        const q = query(collection(db, "ledger"), orderBy("id", "desc"));
-        onSnapshot(q, (snapshot) => {
-            ledgerData = [];
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                if(data.who && data.type && data.month) {
-                    ledgerData.push({ dbId: doc.id, ...data });
-                }
-            });
-            renderDaily();
-            renderSummary();
-        });
+        // -----------------------------------------------------------
+        // 1. 핵심 함수들을 먼저 const로 정의 (스코프 문제 해결)
+        // -----------------------------------------------------------
 
-        window.addData = async function() {
-            const month = document.getElementById('global-month').value;
-            const who = document.getElementById('in-who').value;
-            const type = document.getElementById('in-type').value;
-            const cat = document.getElementById('in-category').value;
-            const method = type === 'expense' ? document.getElementById('in-method').value : '';
-            const desc = document.getElementById('in-desc').value;
-            const amount = Number(document.getElementById('in-amount').value);
-
-            if(!desc || amount === 0) return alert("내용/금액을 확인해주세요.");
-
-            try {
-                await addDoc(collection(db, "ledger"), {
-                    id: Date.now(), month, who, type, cat, method, desc, amount
-                });
-                document.getElementById('in-desc').value = '';
-                document.getElementById('in-amount').value = '';
-                document.getElementById('in-desc').focus();
-            } catch (e) {
-                alert("저장 오류: " + e.message);
-            }
-        }
-
-        window.removeData = async function(dbId) {
-            if(confirm("삭제하시겠습니까?")) {
-                await deleteDoc(doc(db, "ledger", dbId));
-            }
-        }
-
-        window.renderDaily = function() {
+        const renderDaily = () => {
             const targetMonth = globalMonthEl.value;
             const currentData = ledgerData.filter(d => d.month === targetMonth);
             
@@ -211,6 +172,8 @@
 
             currentData.forEach(item => {
                 const tbody = document.getElementById(`list-${item.who}-${item.type}`);
+                if (!tbody) return; // 안전장치
+
                 let badge = "";
                 if(item.type === 'expense') {
                     const bClass = item.method === '카드' ? 'badge-card' : 'badge-cash';
@@ -241,118 +204,48 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        window.renderSummary = function() {
-            const container = document.getElementById('summary-container');
-            container.innerHTML = '';
+        const renderSummary = () => {
+            try {
+                const container = document.getElementById('summary-container');
+                container.innerHTML = '';
 
-            const summary = {};
-            ledgerData.forEach(item => {
-                if(item.who !== 'husband' && item.who !== 'wife') return;
+                const summary = {};
+                ledgerData.forEach(item => {
+                    // 데이터 검증
+                    if(!item.who || !item.month || !item.type) return;
 
-                if(!summary[item.month]) {
-                    summary[item.month] = { 
-                        husband: { income: 0, expense: 0 },
-                        wife: { income: 0, expense: 0 }
-                    };
-                }
-                if(item.type === 'income') summary[item.month][item.who].income += item.amount;
-                else summary[item.month][item.who].expense += item.amount;
-            });
+                    if(!summary[item.month]) {
+                        summary[item.month] = { 
+                            husband: { income: 0, expense: 0 },
+                            wife: { income: 0, expense: 0 }
+                        };
+                    }
+                    if(summary[item.month][item.who]) {
+                        if(item.type === 'income') summary[item.month][item.who].income += (item.amount || 0);
+                        else summary[item.month][item.who].expense += (item.amount || 0);
+                    }
+                });
 
-            const sortedMonths = Object.keys(summary).sort().reverse();
-            let grandBalance = 0;
+                const sortedMonths = Object.keys(summary).sort().reverse();
+                let grandBalance = 0;
 
-            sortedMonths.forEach(month => {
-                const s = summary[month];
-                const husBal = s.husband.income - s.husband.expense;
-                const wifeBal = s.wife.income - s.wife.expense;
-                const monthTotal = husBal + wifeBal;
-                grandBalance += monthTotal;
+                sortedMonths.forEach(month => {
+                    const s = summary[month];
+                    const husBal = s.husband.income - s.husband.expense;
+                    const wifeBal = s.wife.income - s.wife.expense;
+                    const monthTotal = husBal + wifeBal;
+                    grandBalance += monthTotal;
 
-                const cardHTML = `
-                    <div class="summary-card">
-                        <div class="summary-header force-purple">
-                            <span>📅 ${month}</span>
-                            <span class="${monthTotal >= 0 ? 'text-green-300' : 'text-red-300'} text-sm">
-                                합계 ${monthTotal > 0 ? '+' : ''}${monthTotal.toLocaleString()}
-                            </span>
-                        </div>
-                        
-                        <div class="summary-row">
-                            <div class="label-user text-blue-800">👨‍💻 남편</div>
-                            <div>
-                                <span class="val-income text-xs">수입 ${s.husband.income.toLocaleString()}</span> / 
-                                <span class="val-expense text-xs">지출 ${s.husband.expense.toLocaleString()}</span>
+                    const cardHTML = `
+                        <div class="summary-card">
+                            <div class="summary-header force-purple">
+                                <span>📅 ${month}</span>
+                                <span class="${monthTotal >= 0 ? 'text-green-300' : 'text-red-300'} text-sm">
+                                    합계 ${monthTotal > 0 ? '+' : ''}${monthTotal.toLocaleString()}
+                                </span>
                             </div>
-                            <div class="font-bold ${husBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
-                                ${husBal.toLocaleString()}
-                            </div>
-                        </div>
-
-                        <div class="summary-row">
-                            <div class="label-user text-indigo-800">👩‍💼 아내</div>
-                            <div>
-                                <span class="val-income text-xs">수입 ${s.wife.income.toLocaleString()}</span> / 
-                                <span class="val-expense text-xs">지출 ${s.wife.expense.toLocaleString()}</span>
-                            </div>
-                            <div class="font-bold ${wifeBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
-                                ${wifeBal.toLocaleString()}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += cardHTML;
-            });
-            document.getElementById('grand-total-balance').innerText = grandBalance.toLocaleString() + '원';
-        }
-
-        window.updateForm = function() {
-            const type = document.getElementById('in-type').value;
-            const methodSelect = document.getElementById('in-method');
-            const catSelect = document.getElementById('in-category');
-            catSelect.innerHTML = ''; 
-            if(type === 'income') {
-                methodSelect.classList.add('hidden');
-                CAT_INCOME.forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
-            } else {
-                methodSelect.classList.remove('hidden');
-                CAT_EXPENSE.forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
-            }
-            window.updateHint();
-        }
-
-        window.updateHint = function() {
-            const cat = document.getElementById('in-category').value;
-            const desc = document.getElementById('in-desc');
-            if(cat === '월 카드값') desc.placeholder = "예: 현대카드";
-            else if(cat === '고정비') desc.placeholder = "예: 월세";
-            else desc.placeholder = "내용 입력";
-        }
-
-        window.switchTab = function(mode) {
-            const btnWrite = document.querySelector('button[onclick="window.switchTab(\'write\')"]');
-            const btnSummary = document.querySelector('button[onclick="window.switchTab(\'summary\')"]');
-            if (mode === 'write') {
-                document.getElementById('view-write').classList.remove('hidden-tab');
-                document.getElementById('view-summary').classList.add('hidden-tab');
-                btnWrite.classList.add('text-blue-600'); btnWrite.classList.remove('text-gray-400');
-                btnSummary.classList.add('text-gray-400'); btnSummary.classList.remove('text-blue-600');
-                renderDaily();
-            } else {
-                document.getElementById('view-write').classList.add('hidden-tab');
-                document.getElementById('view-summary').classList.remove('hidden-tab');
-                btnSummary.classList.add('text-blue-600'); btnSummary.classList.remove('text-gray-400');
-                btnWrite.classList.add('text-gray-400'); btnWrite.classList.remove('text-blue-600');
-                renderSummary();
-            }
-        }
-
-        updateForm();
-        globalMonthEl.addEventListener('change', window.renderDaily);
-        document.getElementById('in-amount').addEventListener('keydown', (e) => {
-            if(e.key === 'Enter') window.addData();
-        });
-        document.getElementById('btn-add').addEventListener('click', window.addData);
-    </script>
-</body>
-</html>
+                            
+                            <div class="summary-row">
+                                <div class="label-user text-blue-800">👨‍💻 남편</div>
+                                <div>
+                                    <span class="val-income text-xs">수입 ${s.husband.income.toLocaleString()}</span> /
