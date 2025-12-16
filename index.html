@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리 (분리형)</title>
+    <title>부부 통합 자산관리 v7.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
@@ -16,10 +16,9 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        /* 요약 카드 스타일 */
+        /* [변경] 요약 카드 헤더를 보라색(#6b21a8)으로 변경하여 시각적으로 구분 */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
-        /* 구분을 위해 헤더 색상을 바꿈 */
-        .summary-header { background: #047857; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .summary-header { background: #6b21a8; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.95rem; }
         .summary-row:last-child { border-bottom: none; }
         .label-user { font-weight: bold; display: flex; align-items: center; gap: 6px; }
@@ -32,7 +31,7 @@
     <div id="view-write">
         <div class="bg-white sticky top-0 z-40 shadow-md border-b">
             <div class="flex justify-between items-center p-3 bg-gray-800 text-white">
-                <h1 class="font-bold text-lg">📝 월말 정산</h1>
+                <h1 class="font-bold text-lg">📝 월말 정산 (v7.0)</h1>
                 <input type="month" id="global-month" class="text-gray-900 font-bold px-2 py-1 rounded border-none outline-none">
             </div>
             
@@ -101,9 +100,9 @@
     </div>
 
     <div id="view-summary" class="hidden-tab">
-        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-green-700 text-white flex justify-between items-center">
+        <div class="bg-white sticky top-0 z-40 shadow-md p-4 bg-purple-800 text-white flex justify-between items-center">
             <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
-            <div class="text-xs text-gray-100">최근 월 순서</div>
+            <div class="text-xs text-purple-200">v7.0 (보라색이면 최신)</div>
         </div>
 
         <div class="max-w-4xl mx-auto p-4" id="summary-container">
@@ -155,12 +154,10 @@
         const CAT_INCOME = ["월급", "계약금", "정부지원금", "경조사비", "기타수입"];
         const CAT_EXPENSE = ["월 카드값", "고정비", "생활비", "기타지출"];
 
-        // 실시간 데이터 로드
         const q = query(collection(db, "ledger"), orderBy("id", "desc"));
         onSnapshot(q, (snapshot) => {
             ledgerData = [];
             snapshot.forEach((doc) => {
-                // 안전장치: DB에 이상한 데이터가 있어도 죽지 않게 함
                 const data = doc.data();
                 if(data.who && data.type && data.month) {
                     ledgerData.push({ dbId: doc.id, ...data });
@@ -242,17 +239,14 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        // ============================================
-        // 🚀 여기가 수정된 분리 로직입니다! (테이블이 아님)
-        // ============================================
+        // 여기가 진짜 중요! (분리 로직)
         window.renderSummary = function() {
             const container = document.getElementById('summary-container');
             container.innerHTML = '';
 
-            // 데이터 그룹화
             const summary = {};
             ledgerData.forEach(item => {
-                // 안전장치: who가 이상하면 스킵
+                // 데이터 안전장치
                 if(item.who !== 'husband' && item.who !== 'wife') return;
 
                 if(!summary[item.month]) {
@@ -261,7 +255,6 @@
                         wife: { income: 0, expense: 0 }
                     };
                 }
-                // 인물별로 따로 더하기
                 if(item.type === 'income') summary[item.month][item.who].income += item.amount;
                 else summary[item.month][item.who].expense += item.amount;
             });
@@ -276,7 +269,7 @@
                 const monthTotal = husBal + wifeBal;
                 grandBalance += monthTotal;
 
-                // 카드 HTML 생성 (남편 줄 / 아내 줄 구분됨)
+                // 카드 HTML
                 const cardHTML = `
                     <div class="summary-card">
                         <div class="summary-header">
