@@ -248,4 +248,152 @@
                             <div class="summary-row">
                                 <div class="label-user text-blue-800">👨‍💻 남편</div>
                                 <div>
-                                    <span class="val-income text-xs">수입 ${s.husband.income.toLocaleString()}</span> /
+                                    <span class="val-income text-xs">수입 ${s.husband.income.toLocaleString()}</span> / 
+                                    <span class="val-expense text-xs">지출 ${s.husband.expense.toLocaleString()}</span>
+                                </div>
+                                <div class="font-bold ${husBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
+                                    ${husBal.toLocaleString()}
+                                </div>
+                            </div>
+
+                            <div class="summary-row">
+                                <div class="label-user text-indigo-800">👩‍💼 아내</div>
+                                <div>
+                                    <span class="val-income text-xs">수입 ${s.wife.income.toLocaleString()}</span> / 
+                                    <span class="val-expense text-xs">지출 ${s.wife.expense.toLocaleString()}</span>
+                                </div>
+                                <div class="font-bold ${wifeBal >= 0 ? 'text-gray-700' : 'text-red-600'}">
+                                    ${wifeBal.toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += cardHTML;
+                });
+                document.getElementById('grand-total-balance').innerText = grandBalance.toLocaleString() + '원';
+            } catch (err) {
+                console.error(err);
+                document.getElementById('summary-container').innerHTML = `<div class="p-4 text-red-500">에러 발생: ${err.message}</div>`;
+            }
+        }
+
+        const switchTab = (mode) => {
+            const btnWrite = document.getElementById('nav-write');
+            const btnSummary = document.getElementById('nav-summary');
+            
+            if (mode === 'write') {
+                document.getElementById('view-write').classList.remove('hidden-tab');
+                document.getElementById('view-summary').classList.add('hidden-tab');
+                
+                btnWrite.classList.add('text-blue-600', 'active-tab'); 
+                btnWrite.classList.remove('text-gray-400');
+                btnSummary.classList.add('text-gray-400'); 
+                btnSummary.classList.remove('text-blue-600', 'active-tab');
+                
+                renderDaily();
+            } else {
+                document.getElementById('view-write').classList.add('hidden-tab');
+                document.getElementById('view-summary').classList.remove('hidden-tab');
+                
+                btnSummary.classList.add('text-blue-600', 'active-tab'); 
+                btnSummary.classList.remove('text-gray-400');
+                btnWrite.classList.add('text-gray-400'); 
+                btnWrite.classList.remove('text-blue-600', 'active-tab');
+                
+                renderSummary();
+            }
+        }
+
+        const updateForm = () => {
+            const type = document.getElementById('in-type').value;
+            const methodSelect = document.getElementById('in-method');
+            const catSelect = document.getElementById('in-category');
+            catSelect.innerHTML = ''; 
+            if(type === 'income') {
+                methodSelect.classList.add('hidden');
+                CAT_INCOME.forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            } else {
+                methodSelect.classList.remove('hidden');
+                CAT_EXPENSE.forEach(c => catSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            }
+            updateHint();
+        }
+
+        const updateHint = () => {
+            const cat = document.getElementById('in-category').value;
+            const desc = document.getElementById('in-desc');
+            if(cat === '월 카드값') desc.placeholder = "예: 현대카드";
+            else if(cat === '고정비') desc.placeholder = "예: 월세";
+            else desc.placeholder = "내용 입력";
+        }
+
+        const addData = async () => {
+            const month = document.getElementById('global-month').value;
+            const who = document.getElementById('in-who').value;
+            const type = document.getElementById('in-type').value;
+            const cat = document.getElementById('in-category').value;
+            const method = type === 'expense' ? document.getElementById('in-method').value : '';
+            const desc = document.getElementById('in-desc').value;
+            const amount = Number(document.getElementById('in-amount').value);
+
+            if(!desc || amount === 0) return alert("내용/금액을 확인해주세요.");
+
+            try {
+                await addDoc(collection(db, "ledger"), {
+                    id: Date.now(), month, who, type, cat, method, desc, amount
+                });
+                document.getElementById('in-desc').value = '';
+                document.getElementById('in-amount').value = '';
+                document.getElementById('in-desc').focus();
+            } catch (e) {
+                alert("저장 오류: " + e.message);
+            }
+        }
+
+        const removeData = async (dbId) => {
+            if(confirm("삭제하시겠습니까?")) {
+                await deleteDoc(doc(db, "ledger", dbId));
+            }
+        }
+
+        // -----------------------------------------------------------
+        // 2. 외부에서(HTML) 사용할 수 있도록 window에 등록
+        // -----------------------------------------------------------
+        window.switchTab = switchTab;
+        window.updateForm = updateForm;
+        window.updateHint = updateHint;
+        window.addData = addData;
+        window.removeData = removeData;
+        window.renderDaily = renderDaily;
+        window.renderSummary = renderSummary;
+
+        // -----------------------------------------------------------
+        // 3. 실행
+        // -----------------------------------------------------------
+        // 실시간 데이터 로드
+        const q = query(collection(db, "ledger"), orderBy("id", "desc"));
+        onSnapshot(q, (snapshot) => {
+            ledgerData = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if(data.who && data.type && data.month) {
+                    ledgerData.push({ dbId: doc.id, ...data });
+                }
+            });
+            // 데이터 로드 완료 후 화면 갱신
+            const isSummaryTab = !document.getElementById('view-summary').classList.contains('hidden-tab');
+            if(isSummaryTab) renderSummary();
+            else renderDaily();
+        });
+
+        // 초기화
+        updateForm();
+        globalMonthEl.addEventListener('change', renderDaily);
+        document.getElementById('in-amount').addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') addData();
+        });
+        document.getElementById('btn-add').addEventListener('click', addData);
+
+    </script>
+</body>
+</html>
