@@ -16,7 +16,7 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        /* 요약 카드 스타일 (분리형) */
+        /* 요약 카드 스타일 (여기가 핵심: 분리형 디자인) */
         .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
         .summary-header { background: #1f2937; color: white; padding: 10px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .summary-row { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 0.9rem; }
@@ -52,7 +52,7 @@
                 </div>
                 <div class="flex h-12 flex-1 items-center">
                     <select id="in-category" class="excel-input w-28 border-r text-sm font-bold text-gray-600" onchange="window.updateHint()">
-                        </select>
+                    </select>
                     <input type="text" id="in-desc" class="excel-input flex-1 min-w-[80px]" placeholder="내용">
                     <input type="number" id="in-amount" class="excel-input w-24 text-right font-bold text-lg text-blue-900" placeholder="0">
                     <button id="btn-add" class="bg-blue-600 text-white w-16 h-full font-bold text-sm hover:bg-blue-700">입력</button>
@@ -130,7 +130,7 @@
 
     <script type="module">
         // =========================================================
-        // 🔑 입력해주신 키를 적용했습니다.
+        // ✅ 사용자님의 API 키를 그대로 적용했습니다.
         // =========================================================
         const firebaseConfig = {
             apiKey: "AIzaSyBAGmA7oUu5xZcqiEn_JIZ21CO0n6bRFUM",
@@ -140,8 +140,7 @@
             messagingSenderId: "536040673268",
             appId: "1:536040673268:web:5cc54395dd33fbb99bb3a1"
         };
-        // =========================================================
-
+        
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -150,7 +149,6 @@
 
         let ledgerData = [];
         const globalMonthEl = document.getElementById('global-month');
-        // 초기 날짜 세팅
         const today = new Date();
         globalMonthEl.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
@@ -168,10 +166,6 @@
             renderSummary();
         });
 
-        // ----------------------------------------
-        // 기능 함수들
-        // ----------------------------------------
-
         window.addData = async function() {
             const month = document.getElementById('global-month').value;
             const who = document.getElementById('in-who').value;
@@ -181,12 +175,11 @@
             const desc = document.getElementById('in-desc').value;
             const amount = Number(document.getElementById('in-amount').value);
 
-            if(!desc || amount === 0) return alert("내용과 금액을 입력해주세요.");
+            if(!desc || amount === 0) return alert("내용/금액을 확인해주세요.");
 
             try {
                 await addDoc(collection(db, "ledger"), {
-                    id: Date.now(),
-                    month, who, type, cat, method, desc, amount
+                    id: Date.now(), month, who, type, cat, method, desc, amount
                 });
                 document.getElementById('in-desc').value = '';
                 document.getElementById('in-amount').value = '';
@@ -197,12 +190,11 @@
         }
 
         window.removeData = async function(dbId) {
-            if(confirm("정말 삭제하시겠습니까?")) {
+            if(confirm("삭제하시겠습니까?")) {
                 await deleteDoc(doc(db, "ledger", dbId));
             }
         }
 
-        // [탭 1] 작성 화면 렌더링
         window.renderDaily = function() {
             const targetMonth = globalMonthEl.value;
             const currentData = ledgerData.filter(d => d.month === targetMonth);
@@ -246,12 +238,13 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        // [탭 2] 전체보기 요약 렌더링 (인물별 분리!)
+        // ============================================
+        // 🛑 여기가 핵심 변경 사항 (분리 로직)
+        // ============================================
         window.renderSummary = function() {
             const container = document.getElementById('summary-container');
             container.innerHTML = '';
 
-            // 1. 월별로 데이터 그룹화
             const summary = {};
             ledgerData.forEach(item => {
                 if(!summary[item.month]) {
@@ -260,12 +253,11 @@
                         wife: { income: 0, expense: 0 }
                     };
                 }
-                // 인물별 / 수입지출별 합산
+                // 인물별로 따로 더하기
                 if(item.type === 'income') summary[item.month][item.who].income += item.amount;
                 else summary[item.month][item.who].expense += item.amount;
             });
 
-            // 2. 월 내림차순(최신순) 정렬하여 카드 생성
             const sortedMonths = Object.keys(summary).sort().reverse();
             let grandBalance = 0;
 
@@ -276,7 +268,7 @@
                 const monthTotal = husBal + wifeBal;
                 grandBalance += monthTotal;
 
-                // 카드 HTML 생성 (남편 줄 / 아내 줄 분리)
+                // 카드 생성 (남편 줄 / 아내 줄 구분됨)
                 const cardHTML = `
                     <div class="summary-card">
                         <div class="summary-header">
@@ -311,7 +303,6 @@
                 `;
                 container.innerHTML += cardHTML;
             });
-
             document.getElementById('grand-total-balance').innerText = grandBalance.toLocaleString() + '원';
         }
 
@@ -357,15 +348,13 @@
             }
         }
 
-        // 이벤트 리스너
+        // 초기 실행
+        updateForm();
         globalMonthEl.addEventListener('change', window.renderDaily);
         document.getElementById('in-amount').addEventListener('keydown', (e) => {
             if(e.key === 'Enter') window.addData();
         });
         document.getElementById('btn-add').addEventListener('click', window.addData);
-
-        // 초기 실행
-        updateForm();
     </script>
 </body>
 </html>
