@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>부부 통합 자산관리 v8.3 (누적자산)</title>
+    <title>부부 통합 자산관리 v8.4 (영역분리)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; padding-bottom: 80px; background-color: #f3f4f6; }
@@ -19,10 +19,13 @@
         .badge-cash { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
         .hidden-tab { display: none; }
         
-        .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; overflow: hidden; }
-        .summary-header { padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .summary-card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px; overflow: hidden; border: 1px solid #e5e7eb; }
+        .summary-header { padding: 8px 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;}
         
         .force-purple { background-color: #6b21a8 !important; color: white !important; }
+        
+        /* 영역 분리 스타일 */
+        .area-header { text-align: center; padding: 10px; font-weight: bold; border-radius: 8px 8px 0 0; color: white; margin-bottom: 10px;}
     </style>
 </head>
 <body>
@@ -101,25 +104,34 @@
     <div id="view-summary" class="hidden-tab">
         <div class="sticky top-0 z-40 shadow-md p-4 flex justify-between items-center force-purple">
             <h1 class="font-bold text-lg">📊 월별/인물별 요약</h1>
-            <div class="text-xs text-purple-200">v8.3 (누적자산)</div>
+            <div class="text-xs text-purple-200">v8.4 (완전분리)</div>
         </div>
 
-        <div class="max-w-4xl mx-auto p-4" id="summary-container">
-            </div>
+        <div class="max-w-6xl mx-auto p-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <div class="flex flex-col">
+                    <div class="area-header bg-blue-600 shadow-md flex justify-between items-center">
+                        <span>👨‍💻 남편 기록</span>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow mb-4 border-l-4 border-blue-600">
+                        <p class="text-xs text-gray-500 mb-1">현재까지 모은 돈 (누적)</p>
+                        <p class="text-2xl font-bold text-blue-800" id="grand-husband-balance">0원</p>
+                    </div>
+                    <div id="col-husband-list" class="space-y-3"></div>
+                </div>
 
-        <div class="p-4 mb-20">
-            <div class="bg-gray-800 text-white rounded-xl p-5 shadow-lg w-full mx-auto max-w-md">
-                <h3 class="text-center text-sm text-gray-400 mb-4 border-b border-gray-600 pb-2">💰 최종 누적 자산 (현재 기준)</h3>
-                
-                <div class="flex justify-between items-center mb-3">
-                    <span class="text-blue-300 font-bold flex items-center gap-2">👨‍💻 남편 총 자산</span>
-                    <span class="text-xl font-bold" id="grand-husband-balance">0원</span>
+                <div class="flex flex-col">
+                    <div class="area-header bg-pink-500 shadow-md flex justify-between items-center">
+                        <span>👩‍💼 아내 기록</span>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow mb-4 border-l-4 border-pink-500">
+                        <p class="text-xs text-gray-500 mb-1">현재까지 모은 돈 (누적)</p>
+                        <p class="text-2xl font-bold text-pink-700" id="grand-wife-balance">0원</p>
+                    </div>
+                    <div id="col-wife-list" class="space-y-3"></div>
                 </div>
-                
-                <div class="flex justify-between items-center">
-                    <span class="text-pink-300 font-bold flex items-center gap-2">👩‍💼 아내 총 자산</span>
-                    <span class="text-xl font-bold" id="grand-wife-balance">0원</span>
-                </div>
+
             </div>
         </div>
     </div>
@@ -205,11 +217,14 @@
             document.getElementById('month-balance').innerText = (totalIncome - totalExpense).toLocaleString() + '원';
         }
 
-        // [핵심 변경] 누적 자산을 계산하는 로직으로 변경
+        // [핵심 변경] renderSummary 함수에서 영역을 완전히 분리
         const renderSummary = () => {
             try {
-                const container = document.getElementById('summary-container');
-                container.innerHTML = '';
+                // 두 영역 초기화
+                const colHusband = document.getElementById('col-husband-list');
+                const colWife = document.getElementById('col-wife-list');
+                colHusband.innerHTML = '';
+                colWife.innerHTML = '';
 
                 const summary = {};
                 
@@ -229,88 +244,78 @@
                     }
                 });
 
-                // 2. 과거 -> 최신 순으로 정렬하여 누적 계산
+                // 2. 과거 -> 최신 순으로 누적 자산 계산
                 const sortedMonthsAsc = Object.keys(summary).sort();
                 
                 let accHusband = 0;
                 let accWife = 0;
 
-                // 각 달마다 누적액 계산하여 저장
                 sortedMonthsAsc.forEach(month => {
                     const s = summary[month];
-                    // 이번 달 순이익
                     const netHusband = s.husband.income - s.husband.expense;
                     const netWife = s.wife.income - s.wife.expense;
                     
-                    // 누적액 갱신
                     accHusband += netHusband;
                     accWife += netWife;
 
-                    // 해당 월의 데이터에 '누적자산' 속성 추가
                     s.husband.totalAsset = accHusband;
                     s.wife.totalAsset = accWife;
                 });
 
-                // 3. 화면에는 최신순(역순)으로 보여줌
+                // 3. 화면 렌더링 (최신순)
                 const sortedMonthsDesc = sortedMonthsAsc.reverse();
 
-                sortedMonthsDesc.forEach(month => {
-                    const s = summary[month];
-                    const monthNet = (s.husband.income - s.husband.expense) + (s.wife.income - s.wife.expense);
-                    
-                    const cardHTML = `
-                        <div class="summary-card">
-                            <div class="summary-header force-purple">
-                                <span>📅 ${month}</span>
-                                <span class="text-xs font-normal opacity-80">월 순수익: ${monthNet > 0 ? '+' : ''}${monthNet.toLocaleString()}</span>
-                            </div>
-                            
-                            <div class="p-3 border-b border-gray-100" style="background-color: #eff6ff;">
-                                <div class="font-bold text-blue-800 mb-2 flex items-center gap-1">👨‍💻 남편</div>
-                                <div class="grid grid-cols-3 gap-1 text-center items-center">
-                                    <div class="text-blue-600">
-                                        <div class="text-xs text-gray-500 mb-1">수입</div>
-                                        <div class="font-bold text-sm">${s.husband.income.toLocaleString()}</div>
-                                    </div>
-                                    <div class="text-red-500 border-l border-r border-blue-100">
-                                        <div class="text-xs text-gray-500 mb-1">지출</div>
-                                        <div class="font-bold text-sm">${s.husband.expense.toLocaleString()}</div>
-                                    </div>
-                                    <div class="text-gray-800">
-                                        <div class="text-xs text-blue-900 font-bold mb-1">현 자산(누적)</div>
-                                        <div class="font-bold text-base text-blue-900">${s.husband.totalAsset.toLocaleString()}</div>
-                                    </div>
-                                </div>
-                            </div>
+                // 헬퍼 함수: 카드 HTML 생성
+                const createCard = (month, data, type) => {
+                    const net = data.income - data.expense;
+                    const bgClass = type === 'husband' ? 'bg-blue-50 border-blue-100' : 'bg-pink-50 border-pink-100';
+                    const textClass = type === 'husband' ? 'text-blue-900' : 'text-pink-900';
+                    const title = type === 'husband' ? '남편' : '아내';
 
-                            <div class="p-3" style="background-color: #fdf2f8;">
-                                <div class="font-bold text-pink-800 mb-2 flex items-center gap-1">👩‍💼 아내</div>
-                                <div class="grid grid-cols-3 gap-1 text-center items-center">
+                    return `
+                        <div class="summary-card ${bgClass}">
+                            <div class="summary-header">
+                                <span>📅 ${month}</span>
+                                <span class="text-xs font-normal text-gray-500">순수익 ${net > 0 ? '+' : ''}${net.toLocaleString()}</span>
+                            </div>
+                            <div class="p-3 pt-0">
+                                <div class="grid grid-cols-3 gap-1 text-center items-center mt-2">
                                     <div class="text-blue-600">
                                         <div class="text-xs text-gray-500 mb-1">수입</div>
-                                        <div class="font-bold text-sm">${s.wife.income.toLocaleString()}</div>
+                                        <div class="font-bold text-sm">${data.income.toLocaleString()}</div>
                                     </div>
-                                    <div class="text-red-500 border-l border-r border-pink-100">
+                                    <div class="text-red-500 border-l border-r border-gray-200">
                                         <div class="text-xs text-gray-500 mb-1">지출</div>
-                                        <div class="font-bold text-sm">${s.wife.expense.toLocaleString()}</div>
+                                        <div class="font-bold text-sm">${data.expense.toLocaleString()}</div>
                                     </div>
-                                    <div class="text-gray-800">
-                                        <div class="text-xs text-pink-900 font-bold mb-1">현 자산(누적)</div>
-                                        <div class="font-bold text-base text-pink-900">${s.wife.totalAsset.toLocaleString()}</div>
+                                    <div class="${textClass}">
+                                        <div class="text-xs font-bold mb-1 opacity-70">현 자산</div>
+                                        <div class="font-bold text-sm">${data.totalAsset.toLocaleString()}</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     `;
-                    container.innerHTML += cardHTML;
+                };
+
+                sortedMonthsDesc.forEach(month => {
+                    const s = summary[month];
+                    // 남편 쪽에 추가
+                    if (s.husband.income !== 0 || s.husband.expense !== 0 || s.husband.totalAsset !== 0) {
+                        colHusband.innerHTML += createCard(month, s.husband, 'husband');
+                    }
+                    // 아내 쪽에 추가
+                    if (s.wife.income !== 0 || s.wife.expense !== 0 || s.wife.totalAsset !== 0) {
+                        colWife.innerHTML += createCard(month, s.wife, 'wife');
+                    }
                 });
 
+                // 상단 누적 자산 업데이트
                 document.getElementById('grand-husband-balance').innerText = accHusband.toLocaleString() + '원';
                 document.getElementById('grand-wife-balance').innerText = accWife.toLocaleString() + '원';
 
             } catch (err) {
                 console.error(err);
-                document.getElementById('summary-container').innerHTML = `<div class="p-4 text-red-500">에러 발생: ${err.message}</div>`;
             }
         }
 
